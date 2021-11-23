@@ -3,7 +3,6 @@
 from flask import Flask, render_template, request, Markup
 import numpy as np
 import pandas as pd
-from utils.disease import disease_dic
 from utils.fertilizer import fertilizer_dic
 import requests
 import config
@@ -58,11 +57,7 @@ disease_classes = ['Apple___Apple_scab',
                    'Tomato___Tomato_mosaic_virus',
                    'Tomato___healthy']
 
-disease_model_path = 'models/plant_disease_model.pth'
-disease_model = ResNet9(3, len(disease_classes))
-disease_model.load_state_dict(torch.load(
-    disease_model_path, map_location=torch.device('cpu')))
-disease_model.eval()
+
 
 
 # Loading crop recommendation model
@@ -72,7 +67,7 @@ crop_recommendation_model = pickle.load(
     open(crop_recommendation_model_path, 'rb'))
 
 
-# =========================================================================================
+
 
 # Custom functions for calculations
 
@@ -100,27 +95,6 @@ def weather_fetch(city_name):
         return None
 
 
-def predict_image(img, model=disease_model):
-    """
-    Transforms image to tensor and predicts disease label
-    :params: image
-    :return: prediction (string)
-    """
-    transform = transforms.Compose([
-        transforms.Resize(256),
-        transforms.ToTensor(),
-    ])
-    image = Image.open(io.BytesIO(img))
-    img_t = transform(image)
-    img_u = torch.unsqueeze(img_t, 0)
-
-    # Get predictions from model
-    yb = model(img_u)
-    # Pick index with highest probability
-    _, preds = torch.max(yb, dim=1)
-    prediction = disease_classes[preds[0].item()]
-    # Retrieve the class label
-    return prediction
 
 # ===============================================================================================
 # ------------------------------------ FLASK APP -------------------------------------------------
@@ -133,7 +107,7 @@ app = Flask(__name__)
 
 @ app.route('/')
 def home():
-    title = 'Harvestify - Home'
+    title = 'Farmrasist - Home'
     return render_template('index.html', title=title)
 
 # render crop recommendation form page
@@ -141,7 +115,7 @@ def home():
 
 @ app.route('/crop-recommend')
 def crop_recommend():
-    title = 'Harvestify - Crop Recommendation'
+    title = 'Farmrasist - Crop Recommendation'
     return render_template('crop.html', title=title)
 
 # render fertilizer recommendation form page
@@ -153,21 +127,14 @@ def fertilizer_recommendation():
 
     return render_template('fertilizer.html', title=title)
 
-# render disease prediction input page
 
-
-
-
-# ===============================================================================================
-
-# RENDER PREDICTION PAGES
 
 # render crop recommendation result page
 
 
 @ app.route('/crop-predict', methods=['POST'])
 def crop_prediction():
-    title = 'Harvestify - Crop Recommendation'
+    title = 'Farmrasist - Crop Recommendation'
 
     if request.method == 'POST':
         N = int(request.form['nitrogen'])
@@ -235,29 +202,8 @@ def fert_recommend():
 
     return render_template('fertilizer-result.html', recommendation=response, title=title)
 
-# render disease prediction result page
 
 
-@app.route('/disease-predict', methods=['GET', 'POST'])
-def disease_prediction():
-    title = 'Harvestify - Disease Detection'
-
-    if request.method == 'POST':
-        if 'file' not in request.files:
-            return redirect(request.url)
-        file = request.files.get('file')
-        if not file:
-            return render_template('disease.html', title=title)
-        try:
-            img = file.read()
-
-            prediction = predict_image(img)
-
-            prediction = Markup(str(disease_dic[prediction]))
-            return render_template('disease-result.html', prediction=prediction, title=title)
-        except:
-            pass
-    return render_template('disease.html', title=title)
 
 
 # ===============================================================================================
